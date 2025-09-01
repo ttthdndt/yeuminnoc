@@ -58,6 +58,18 @@
       box-shadow: 0 6px 20px rgba(0,0,0,0.35); transition: transform .15s ease, background .2s ease;
     }
     .btn-audio:hover { transform: translateY(-1px); background: rgba(255,255,255,0.22); }
+      /* GIF góc trái trên */
+    .corner-gif {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      width: clamp(96px, 18vw, 220px); /* tự co giãn theo màn hình */
+      z-index: 4; /* trên overlay & chữ rơi */
+      pointer-events: none; /* không chặn click lên trang */
+      
+      filter: contrast(1.15) brightness(1.05);
+      image-rendering: -webkit-optimize-contrast;
+    }
   </style>
 </head>
 <body>
@@ -66,6 +78,9 @@
     <div id="player"></div>
   </div>
   <div class="overlay" aria-hidden="true"></div>
+
+  <!-- GIF góc trái trên (hãy đổi src thành đường dẫn GIF của bạn, ví dụ /images/cat.gif) -->
+  <img id="cornerGif" class="corner-gif" src="cat-dance.gif" alt="cat gif" decoding="async" />
 
   <!-- Nút điều khiển âm thanh -->
   <div class="controls">
