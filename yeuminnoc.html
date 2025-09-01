@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yêu Nọc ❤️ – Background YouTube + Âm thanh</title>
+  <style>
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000; /* fallback */
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+
+    /* Ngăn chọn/copy toàn trang (rào vặt) */
+    * { user-select: none; -webkit-user-select: none; }
+
+    /* ==== NỀN VIDEO YOUTUBE TOÀN MÀN HÌNH ==== */
+    .video-bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
+    .video-bg iframe {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      border: 0; pointer-events: none; /* ko nhận chuột */
+      /* width/height sẽ được set động bằng JS để luôn COVER toàn màn hình */
+    }
+
+    /* Lớp phủ tăng tương phản chữ */
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1; }
+
+    /* ==== CHỮ/TRÁI TIM RƠI ==== */
+    .falling {
+      position: fixed; top: -10vh; will-change: transform, opacity; z-index: 2;
+      animation-timing-function: linear; animation-fill-mode: forwards; opacity: 0.95;
+      filter: drop-shadow(0 2px 2px rgba(0,0,0,0.6));
+    }
+    .falling .content { display: inline-block; white-space: nowrap; user-select: none; }
+
+    /* rơi thẳng */
+    @keyframes fall-straight { from { transform: translateY(-10vh); opacity: 1; } to { transform: translateY(110vh); opacity: 0.85; } }
+    /* rơi chéo trái */
+    @keyframes fall-left { from { transform: translate(0, -10vh); opacity: 1; } to { transform: translate(-250px, 110vh); opacity: 0.85; } }
+    /* rơi chéo phải */
+    @keyframes fall-right { from { transform: translate(0, -10vh); opacity: 1; } to { transform: translate(250px, 110vh); opacity: 0.85; } }
+    /* Xoáy + lắc ngang cho phần NỘI DUNG (con) */
+    @keyframes spin-sway {
+      0% { transform: translateX(0) rotate(0deg); }
+      25% { transform: translateX(24px) rotate(180deg); }
+      50% { transform: translateX(-24px) rotate(360deg); }
+      75% { transform: translateX(24px) rotate(540deg); }
+      100% { transform: translateX(0) rotate(720deg); }
+    }
+
+    /* ==== NÚT BẬT/TẮT ÂM THANH ==== */
+    .controls { position: fixed; right: 16px; bottom: 16px; z-index: 3; display: flex; gap: 10px; align-items: center; }
+    .btn-audio {
+      appearance: none; border: 0; border-radius: 999px; padding: 12px 18px; font-weight: 700; font-size: 16px;
+      background: rgba(255,255,255,0.14); color: #fff; cursor: pointer; backdrop-filter: blur(6px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.35); transition: transform .15s ease, background .2s ease;
+    }
+    .btn-audio:hover { transform: translateY(-1px); background: rgba(255,255,255,0.22); }
+  </style>
+</head>
+<body>
+  <!-- NỀN VIDEO YOUTUBE (sử dụng IFrame API để điều khiển âm thanh) -->
+  <div class="video-bg" aria-hidden="true">
+    <div id="player"></div>
+  </div>
+  <div class="overlay" aria-hidden="true"></div>
+
+  <!-- Nút điều khiển âm thanh -->
+  <div class="controls">
+    <button id="toggleAudio" class="btn-audio">Bật nhạc 🔊</button>
+  </div>
+
+  <script>
+    // === TẢI IFRAME API ===
+    (function loadYT() {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      document.head.appendChild(tag);
+    })();
+
+    let player;
+    window.onYouTubeIframeAPIReady = function() {
+      player = new YT.Player('player', {
+        videoId: 'fXpJlk0sTGU',
+        playerVars: {
+          autoplay: 1, mute: 1, controls: 0, loop: 1, playlist: 'fXpJlk0sTGU',
+          modestbranding: 1, rel: 0, iv_load_policy: 3, playsinline: 1
+        },
+        events: {
+          onReady: (e) => { e.target.mute(); e.target.playVideo(); resizePlayer(); }
+        }
+      });
+    };
+
+    // Nút bật/tắt âm thanh (cần user interaction để mở tiếng do chính sách trình duyệt)
+    const btn = document.getElementById('toggleAudio');
+    btn.addEventListener('click', () => {
+      try {
+        if (!player) return;
+        const muted = player.isMuted && player.isMuted();
+        if (muted) {
+          player.unMute();
+          player.setVolume(70); // âm lượng mặc định
+          player.playVideo();
+          btn.textContent = 'Tắt tiếng 🔇';
+        } else {
+          player.mute();
+          btn.textContent = 'Bật nhạc 🔊';
+        }
+      } catch (e) {
+        try { player.unMute(); player.setVolume(70); player.playVideo(); btn.textContent = 'Tắt tiếng 🔇'; } catch(_) {}
+      }
+    });
+
+    // ====== LUÔN LẤP ĐẦY MÀN HÌNH (COVER) ======
+    function resizePlayer() {
+      if (!player || !player.getIframe) return;
+      const vw = window.innerWidth || document.documentElement.clientWidth;
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      const ratio = 16/9;    // tỉ lệ video
+      const overscan = 1.08; // tăng nhẹ để xoá mép đen/letterbox
+
+      let width = vw, height = vw / ratio;
+      if (height < vh) { // nếu chưa đủ cao -> tính theo chiều dọc
+        height = vh;
+        width = height * ratio;
+      }
+      width *= overscan;
+      height *= overscan;
+
+      try { player.setSize(Math.ceil(width), Math.ceil(height)); } catch (_) {}
+
+      const el = document.getElementById('player');
+      if (el) {
+        el.style.width = Math.ceil(width) + 'px';
+        el.style.height = Math.ceil(height) + 'px';
+        el.style.position = 'fixed';
+        el.style.top = '50%';
+        el.style.left = '50%';
+        el.style.transform = 'translate(-50%, -50%)';
+      }
+    }
+
+    window.addEventListener('resize', resizePlayer);
+    window.addEventListener('orientationchange', resizePlayer);
+    document.addEventListener('DOMContentLoaded', () => setTimeout(resizePlayer, 0));
+    setInterval(resizePlayer, 1500);
+  </script>
+
+  <script>
+    // ====== HIỆU ỨNG CHỮ & TIM RƠI ======
+    const texts = [
+      'Anh yêu em', 'Mãi yêu Nọc', 'Làm người yêu anh nhé', 'Quạc',
+      '❤️','💖','💘','💕','💞','💓','💗','💜','💚'
+    ];
+    const MODES = ['straight', 'spin', 'left', 'right'];
+    const COLORS = ['#ffc0cb', '#ff5a7a', '#ffd166', '#c8ff89', '#8fd3ff', '#d0b3ff', '#ffffff'];
+
+    const rand = (arr) => arr[Math.floor(Math.random()*arr.length)];
+    const randRange = (min, max) => Math.random()*(max-min)+min;
+
+    function createFalling() {
+      const outer = document.createElement('div');
+      outer.className = 'falling';
+      const inner = document.createElement('span');
+      inner.className = 'content';
+      inner.textContent = rand(texts);
+
+      // vị trí & style
+      outer.style.left = randRange(0,100) + 'vw';
+      inner.style.fontSize = randRange(20, 52) + 'px';
+      inner.style.color = rand(COLORS);
+
+      // mode chuyển động
+      const mode = rand(MODES);
+      const duration = randRange(7.5, 12.5);
+      const delay = randRange(0, 1.2);
+
+      let outerAnim = 'fall-straight';
+      if (mode === 'left') outerAnim = 'fall-left';
+      if (mode === 'right') outerAnim = 'fall-right';
+      outer.style.animation = `${outerAnim} ${duration}s linear ${delay}s forwards`;
+
+      if (mode === 'spin') {
+        inner.style.animation = `spin-sway ${Math.max(4, duration * 0.8)}s linear infinite`;
+      }
+
+      outer.appendChild(inner);
+      document.body.appendChild(outer);
+      outer.addEventListener('animationend', () => outer.remove());
+    }
+
+    // Mật độ cao: mỗi 100ms sinh 2, thỉnh thoảng burst thêm 3
+    setInterval(() => {
+      createFalling();
+      createFalling();
+      if (Math.random() < 0.08) for (let i=0;i<3;i++) createFalling();
+    }, 100);
+  </script>
+
+  <!-- ===== RÀO VẶT: CHẶN MỘT SỐ HÀNH VI & PHÍM DEVTOOLS (KHÔNG TUYỆT ĐỐI) ===== -->
+  <script>
+    // Chặn menu chuột phải, kéo thả, copy
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('dragstart',  e => e.preventDefault());
+    document.addEventListener('copy',       e => e.preventDefault());
+
+    // Chặn một số phím tắt phổ biến mở DevTools / xem nguồn
+    document.addEventListener('keydown', e => {
+      const k = (e.key || '').toUpperCase();
+      const ctrl = e.ctrlKey || e.metaKey; // hỗ trợ macOS
+      if (
+        k === 'F12' ||
+        (e.ctrlKey && e.shiftKey && ['I','J','C','K'].includes(k)) || // Ctrl+Shift+I/J/C/K
+        (ctrl && ['U','S','P'].includes(k)) // Ctrl/Cmd + U/S/P
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    }, { capture: true });
+
+    // Phát hiện (ước lượng) DevTools mở -> làm mờ trang (chỉ rào vặt)
+    let devtoolsOpen = false;
+    const TH = 160; // ngưỡng chênh lệch kích thước cửa sổ
+    function checkDevtools() {
+      const wDiff = window.outerWidth  - window.innerWidth;
+      const hDiff = window.outerHeight - window.innerHeight;
+      const opened = (wDiff > TH) || (hDiff > TH);
+      if (opened !== devtoolsOpen) {
+        devtoolsOpen = opened;
+        document.body.style.filter = devtoolsOpen ? 'blur(6px)' : '';
+      }
+    }
+    setInterval(checkDevtools, 1000);
+
+    // Thủ thuật anti-debug (không đảm bảo): nếu debugger làm trễ, áp hiệu ứng mờ
+    (function antiDebug(){
+      const t0 = Date.now();
+      // eslint-disable-next-line no-debugger
+      debugger;
+      const elapsed = Date.now() - t0;
+      if (elapsed > 200) {
+        document.body.style.filter = 'blur(6px)';
+      }
+      setTimeout(antiDebug, 3000);
+    })();
+  </script>
+</body>
+</html>
